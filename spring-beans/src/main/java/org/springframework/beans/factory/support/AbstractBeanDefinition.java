@@ -147,6 +147,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 
 	private boolean lazyInit = false;
 
+	// 自动注入模型
 	private int autowireMode = AUTOWIRE_NO;
 
 	private int dependencyCheck = DEPENDENCY_CHECK_NONE;
@@ -165,6 +166,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 
 	private boolean nonPublicAccessAllowed = true;
 
+	//是否采用宽松的构造函数解析
 	private boolean lenientConstructorResolution = true;
 
 	@Nullable
@@ -173,6 +175,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	@Nullable
 	private String factoryMethodName;
 
+	// 构造方法的参数
 	@Nullable
 	private ConstructorArgumentValues constructorArgumentValues;
 
@@ -741,6 +744,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	/**
 	 * Return whether to allow access to non-public constructors and methods.
 	 */
+	// 是否允许访问私有方法
 	public boolean isNonPublicAccessAllowed() {
 		return this.nonPublicAccessAllowed;
 	}
@@ -758,6 +762,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	/**
 	 * Return whether to resolve constructors in lenient mode or in strict mode.
 	 */
+	// 是否采用宽松的构造函数解析
 	public boolean isLenientConstructorResolution() {
 		return this.lenientConstructorResolution;
 	}

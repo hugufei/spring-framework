@@ -164,6 +164,7 @@ public abstract class BeanUtils {
 	 * @throws BeanInstantiationException if the bean cannot be instantiated
 	 * @see Constructor#newInstance
 	 */
+	// 使用指定的构造方法 实例化bean
 	public static <T> T instantiateClass(Constructor<T> ctor, Object... args) throws BeanInstantiationException {
 		Assert.notNull(ctor, "Constructor must not be null");
 		try {
@@ -193,6 +194,9 @@ public abstract class BeanUtils {
 	 * @param clazz the class to check
 	 * @since 5.0
 	 * @see <a href="https://kotlinlang.org/docs/reference/classes.html#constructors">Kotlin docs</a>
+	 *
+	 * 返回所提供类的主要构造函数。对于Kotlin类，返回与Kotlin主构造函数（在Kotlin规范中定义）相对应的Java构造函数。
+	 * 否则，特别是对于非Kotlin类，这仅返回{@code null}
 	 */
 	@SuppressWarnings("unchecked")
 	@Nullable
