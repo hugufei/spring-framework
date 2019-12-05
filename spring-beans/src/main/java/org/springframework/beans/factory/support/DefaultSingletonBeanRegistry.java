@@ -161,6 +161,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	@Override
 	@Nullable
 	public Object getSingleton(String beanName) {
+		// 重点，第一次调用getSingleton的时候， 一定要记住这里传的是一个true
 		return getSingleton(beanName, true);
 	}
 
@@ -174,16 +175,57 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+		// 首先spring会去第一个map当中去获取一个bean；说白了就是从容器中获取
+		// 说明我们如果在容器初始化后调用getBean, 其实就从map中去获取一个bean
+		// 假设是初始化A的时候那么这个时候肯定等于空
 		Object singletonObject = this.singletonObjects.get(beanName);
+
+		// 我们这里的场景是初始化对象A第一次调用这个方法
+		// 这段代码非常重要，首先从容器中拿，如果拿不到，再判断这个对象是不是在set集合
+		// 这里的set集合前文已经解释过了，就是判断a是不是正在创建
+		// 假设现在a不在创建过程，那么直接返回一个空，第一次getSingleton返回
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+			// A引用B，B应用A，B注入A属性的时候会进这个判断
 			synchronized (this.singletonObjects) {
+				// 先从第三个map当中获取a这个对象
 				singletonObject = this.earlySingletonObjects.get(beanName);
+				// 如果第三个map获取不到a对象，再看是否允许了循环引用, 而这里的allowEarlyReference是true
 				if (singletonObject == null && allowEarlyReference) {
+					// 然后从第二个map中获取一个表达式
+					// 这里要非常注意第二个map当中存的不是一个单纯的对象
+					// 前面说了第二个map当中存的是一个表达式，你可以理解为存了一个工厂，或者理解存了一个方法，方法里面有个参数就是这个对象
+					// 按照spring的命名来分析应该理解为一个工厂singletonFactory
+					// 一个能够生成a对象的工厂,那么他为什么需要这么一个工厂
+					// 这里我先大概说一下，是为了通过工厂来改变这个对象
+					// 至于为什么要改变对象，下文我会分析
+					// 当然大部分情况下是不需要改变这个对象的
+					// 读者先可以考虑不需要改变这个对象，
+					// 那么这个map里面存的工厂就生产就是这个原对象，那么和第三个map功能一样
 					ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
 					if (singletonFactory != null) {
+						// 调用表达式，说白了就是调用工厂的方法，然后改变对象
+						// 我们假设对象不需要改变的情况那么返回了原对象就是a
+						// 需要改变的情况我们下文再分享
 						singletonObject = singletonFactory.getObject();
+						// 然后把这个对象放到第三个map当中
 						this.earlySingletonObjects.put(beanName, singletonObject);
+						// 把这个对象、或者表达式、或者工厂从第二个map中移除
 						this.singletonFactories.remove(beanName);
+
+						// 重点:面试会考---为什么要放到第三个？为什么要移除第二个？
+						// 首先我们通过分析做一个总结:
+						// spring首先从第一个map中拿a这个bean
+						// 拿不到，从第三个map当中拿a这个对象
+						// 拿不到，从第二个map拿a这个对象或者工厂
+						// 拿到之后放到第三个map，移除第二个map里面的表达式、或者工厂
+
+						// 如果对象需要改变，当改变完成之后就把他放到第三个里面
+						// 这里的情况是b需要a而进行的步骤，试想一下以后如果还有C需要依赖a
+						// 就不需要重复第二个map的工作了，也就是改变对象的工作了。
+						// 因为改变完成之后的a对象已经在第三个map中了。不知道读者能不能懂笔者的意思
+						// 如果对象不需要改变道理是一样的，也同样在第三个map取就是了；
+						// 至于为什么需要移除第二个map里面的工厂、或者表达式就更好理解了
+						// 他已经对a做完了改变，改变之后的对象已经在第三个map了，为了方便gc
 					}
 				}
 			}
@@ -199,9 +241,15 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * with, if necessary
 	 * @return the registered singleton object
 	 */
+	// 带singletonFactory的获取单例的方法
+	// 1、标志bean正在创建
+	// 2、调用createBean方法创建bean【核心方法】
+	// 3、标志bean创建完成
+	// 4、将bean加入单例池中
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
 		synchronized (this.singletonObjects) {
+			// 1、从singletonObjects单例池中拿，第一次一般为空
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
 				if (this.singletonsCurrentlyInDestruction) {
@@ -212,6 +260,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				// 1、标志bean正在创建
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -219,6 +268,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 2、调用的就是createBean方法
+					// spring会首先实例化一个对象，然后走生命周期
+					// 走生命周期的时候前面说过会判断是否允许循环依赖, 如果允许则会把创建出来的这个对象放到第二个map当中
+					// 然后接着走生命周期当他走到属性填充的时候会去get一下B，因为需要填充B，也就是大家认为的自动注入
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
@@ -242,8 +295,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					// 3、删除bean的正在创建标志
 					afterSingletonCreation(beanName);
 				}
+				// 4、将bean加入单例池中
 				if (newSingleton) {
 					addSingleton(beanName, singletonObject);
 				}

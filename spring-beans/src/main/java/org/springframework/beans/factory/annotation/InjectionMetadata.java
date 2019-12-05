@@ -87,6 +87,8 @@ public class InjectionMetadata {
 				if (logger.isTraceEnabled()) {
 					logger.trace("Processing injected element of bean '" + beanName + "': " + element);
 				}
+				// target是正在初始化的bean对象，beanName是正在初始化的名称
+				// element是指要注入的field,如 BService
 				element.inject(target, beanName, pvs);
 			}
 		}
@@ -184,6 +186,7 @@ public class InjectionMetadata {
 					return;
 				}
 				try {
+					//反射，执行调用
 					Method method = (Method) this.member;
 					ReflectionUtils.makeAccessible(method);
 					method.invoke(target, getResourceToInject(target, requestingBeanName));
